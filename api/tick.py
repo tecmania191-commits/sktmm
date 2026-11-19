@@ -52,64 +52,103 @@ def fetch_live_nse_price():
     return {"price": 25475.0, "source": "ESTIMATED"}
 
 def fetch_fresh_market_candles():
-    try:
-        url = "https://query1.finance.yahoo.com/v8/finance/chart/^NSEI?range=5d&interval=5m"
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=4.5) as resp:
-            data = json.loads(resp.read().decode())["chart"]["result"][0]
-            ts = data["timestamp"]
-            q = data["indicators"]["quote"][0]
-            candles = []
-            for i in range(len(ts)):
-                t = (ts[i] // 300) * 300
-                o, h, l, c = q["open"][i], q["high"][i], q["low"][i], q["close"][i]
-                v = q.get("volume", [])[i] if "volume" in q and q["volume"] else 1000
-                if o is not None and c is not None and h is not None and l is not None:
-                    dt = datetime.fromtimestamp(t, timezone.utc) + timedelta(hours=5, minutes=30)
-                    dt_str = dt.strftime("%Y-%m-%d %H:%M")
-                    candles.append({
-                        "time": t,
-                        "datetime": dt_str,
-                        "date": dt_str.split(" ")[0],
-                        "open": round(o, 2),
-                        "high": round(h, 2),
-                        "low": round(l, 2),
-                        "close": round(c, 2),
-                        "volume": int(v) if v else 1000
-                    })
-            
-            # Intraday cumulative VWAP
-            curr_date = None
-            cum_pv = 0
-            cum_vol = 0
-            for c in candles:
-                if c["date"] != curr_date:
-                    curr_date = c["date"]
+    err_msg = ""
+    for symbol in ["%5ENSEI", "^NSEI"]:
+        try:
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=5d&interval=5m"
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "*/*"
+            }
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=4.5) as resp:
+                data = json.loads(resp.read().decode())["chart"]["result"][0]
+                ts = data["timestamp"]
+                q = data["indicators"]["quote"][0]
+                candles = []
+                for i in range(len(ts)):
+                    t = (ts[i] // 300) * 300
+                    o, h, l, c = q["open"][i], q["high"][i], q["low"][i], q["close"][i]
+                    v = q.get("volume", [])[i] if "volume" in q and q["volume"] else 1000
+                    if o is not None and c is not None and h is not None and l is not None:
+                        dt = datetime.fromtimestamp(t, timezone.utc) + timedelta(hours=5, minutes=30)
+                        dt_str = dt.strftime("%Y-%m-%d %H:%M")
+                        candles.append({
+                            "time": t,
+                            "datetime": dt_str,
+                            "date": dt_str.split(" ")[0],
+                            "open": round(o, 2),
+                            "high": round(h, 2),
+                            "low": round(l, 2),
+                            "close": round(c, 2),
+                            "volume": int(v) if v else 1000
+                        })
+                
+                if candles:
+                    # Intraday cumulative VWAP
+                    curr_date = None
                     cum_pv = 0
                     cum_vol = 0
-                tp = (c["high"] + c["low"] + c["close"]) / 3.0
-                cum_pv += tp * c["volume"]
-                cum_vol += c["volume"]
-                c["vwap"] = round(cum_pv / cum_vol, 2)
-            
-            # Prev day POC
-            dates = sorted(list(set(c["date"] for c in candles)))
-            prev_poc = 25245.0
-            if len(dates) >= 2:
-                prev_candles = [c for c in candles if c["date"] == dates[-2]]
-                bins = {}
-                for c in prev_candles:
-                    b = round(c["close"] / 5.0) * 5.0
-                    bins[b] = bins.get(b, 0) + c["volume"]
-                if bins:
-                    prev_poc = max(bins.items(), key=lambda x: x[1])[0]
-            
-            today = candles[-1]["date"] if candles else ""
-            today_candles = [c for c in candles if c["date"] == today]
-            today_vwap = today_candles[-1]["vwap"] if today_candles else 25345.0
-            return candles, today_vwap, prev_poc
-    except Exception:
-        return None, 25345.0, 25245.0
+                    for c in candles:
+                        if c["date"] != curr_date:
+                            curr_date = c["date"]
+                            cum_pv = 0
+                            cum_vol = 0
+                        tp = (c["high"] + c["low"] + c["close"]) / 3.0
+                        cum_pv += tp * c["volume"]
+                        cum_vol += c["volume"]
+                        c["vwap"] = round(cum_pv / cum_vol, 2)
+                    
+                    # Prev day POC
+                    dates = sorted(list(set(c["date"] for c in candles)))
+                    prev_poc = 25245.0
+                    if len(dates) >= 2:
+                        prev_candles = [c for c in candles if c["date"] == dates[-2]]
+                        bins = {}
+                        for c in prev_candles:
+                            b = round(c["close"] / 5.0) * 5.0
+                            bins[b] = bins.get(b, 0) + c["volume"]
+                        if bins:
+                            prev_poc = max(bins.items(), key=lambda x: x[1])[0]
+                    
+                    today = candles[-1]["date"] if candles else ""
+                    today_candles = [c for c in candles if c["date"] == today]
+                    today_vwap = today_candles[-1]["vwap"] if today_candles else 25345.0
+                    return candles, today_vwap, prev_poc, "OK"
+        except Exception as e:
+            err_msg += f"{symbol}: {str(e)} | "
+
+    # Fallback to nifty_5m_data.csv if available
+    csv_candidates = [
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "nifty_5m_data.csv"),
+        os.path.join(os.getcwd(), "nifty_5m_data.csv")
+    ]
+    for p in csv_candidates:
+        if os.path.exists(p):
+            try:
+                import csv
+                candles = []
+                with open(p, "r", encoding="utf-8") as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        t = int(row["time"])
+                        candles.append({
+                            "time": t,
+                            "datetime": row.get("datetime", ""),
+                            "date": row.get("date", ""),
+                            "open": float(row["open"]),
+                            "high": float(row["high"]),
+                            "low": float(row["low"]),
+                            "close": float(row["close"]),
+                            "volume": int(float(row.get("volume", 1000)))
+                        })
+                # Take last 300 candles
+                candles = candles[-300:]
+                return candles, 25345.0, 25245.0, f"CSV_FALLBACK ({err_msg})"
+            except Exception as e2:
+                err_msg += f"CSV: {str(e2)} | "
+
+    return None, 25345.0, 25245.0, err_msg
 
 def evaluate_strategy_state(ltp, vwap=25255.0, poc=25385.0, atr=16.0):
     ist = get_ist_now()
@@ -221,7 +260,7 @@ class handler(BaseHTTPRequestHandler):
 
         # Handle /api/candles (Dynamic fresh candles + today session)
         if path == "/api/candles":
-            candles, vwap, poc = fetch_fresh_market_candles()
+            candles, vwap, poc, debug_info = fetch_fresh_market_candles()
             live_info = fetch_live_nse_price()
             ltp = live_info["price"]
             if candles and len(candles) > 0:
@@ -242,7 +281,8 @@ class handler(BaseHTTPRequestHandler):
                 "vwap": vwap,
                 "poc": poc,
                 "live_pred": pred,
-                "ltp": ltp
+                "ltp": ltp,
+                "debug": debug_info
             }).encode("utf-8"))
             return
 
