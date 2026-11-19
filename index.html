@@ -790,6 +790,37 @@
     drawTodayLevels(LIVE_PRED);
     setTimeout(() => setChartZoom('2D'), 200);
 
+    // Dynamic Live Candle Synchronizer: Fetches all today's candles dynamically to eliminate gaps
+    async function loadFreshCandles() {
+      try {
+        const res = await fetch('/api/candles?t=' + Date.now());
+        if (res.ok) {
+          const data = await res.json();
+          if (data.candles && data.candles.length > 0) {
+            REAL_CANDLES = data.candles;
+            candleSeries.setData(REAL_CANDLES);
+            if (data.live_pred) {
+              updateLivePredictionUI(data.live_pred);
+              drawTodayLevels(data.live_pred);
+            }
+            currentBar = REAL_CANDLES[REAL_CANDLES.length - 1];
+            if (currentBar) {
+              document.getElementById('ltpDisplay').innerText = currentBar.close.toFixed(2);
+              document.getElementById('barOpen').innerText = currentBar.open.toFixed(2);
+              document.getElementById('barHigh').innerText = currentBar.high.toFixed(2);
+              document.getElementById('barLow').innerText = currentBar.low.toFixed(2);
+              document.getElementById('barClose').innerText = currentBar.close.toFixed(2);
+            }
+            const todayCount = REAL_CANDLES.filter(c => c.date === (data.live_pred ? data.live_pred.today_date : '')).length;
+            const countEl = document.getElementById('todayCandleCount');
+            if (countEl) countEl.innerText = todayCount;
+            setTimeout(() => setChartZoom('TODAY'), 150);
+          }
+        }
+      } catch (e) {}
+    }
+    loadFreshCandles();
+
     const ltpDisplay = document.getElementById('ltpDisplay');
     const banner = document.getElementById('alertBanner');
 
