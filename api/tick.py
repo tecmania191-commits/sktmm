@@ -1,4 +1,5 @@
 import json
+import os
 import urllib.request
 import urllib.parse
 from http.server import BaseHTTPRequestHandler
@@ -133,6 +134,32 @@ class handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path.rstrip("/")
         
+        # If frontend HTML is requested
+        if not path.startswith("/api"):
+            candidate_paths = [
+                os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "index.html"),
+                os.path.join(os.getcwd(), "index.html"),
+                os.path.join(os.getcwd(), "public", "index.html")
+            ]
+            html_content = None
+            for p in candidate_paths:
+                if os.path.exists(p):
+                    try:
+                        with open(p, "rb") as f:
+                            html_content = f.read()
+                        break
+                    except Exception:
+                        pass
+            
+            if html_content:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+                self.end_headers()
+                self.wfile.write(html_content)
+                return
+
+        # Otherwise serve API live tick data
         live_info = fetch_live_nse_price()
         ltp = live_info["price"]
         pred = evaluate_strategy_state(ltp)
