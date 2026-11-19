@@ -2,7 +2,6 @@
   "rewrites": [
     { "source": "/api/live_tick", "destination": "/api/tick.py" },
     { "source": "/api/tick", "destination": "/api/tick.py" },
-    { "source": "/api/(.*)", "destination": "/api/tick.py" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/api/(.*)", "destination": "/api/tick.py" }
   ]
 }
