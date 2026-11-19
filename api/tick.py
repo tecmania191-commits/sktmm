@@ -258,8 +258,12 @@ class handler(BaseHTTPRequestHandler):
                 self.wfile.write(html_content)
                 return
 
+        query = urllib.parse.parse_qs(parsed.query)
+        endpoint = query.get("endpoint", [""])[0]
+        orig_path = self.headers.get("x-matched-path", "") or self.headers.get("x-forwarded-uri", "") or path
+
         # Handle /api/candles (Dynamic fresh candles + today session)
-        if path == "/api/candles":
+        if endpoint == "candles" or "candles" in path or "candles" in orig_path or "candles" in self.path:
             candles, vwap, poc, debug_info = fetch_fresh_market_candles()
             live_info = fetch_live_nse_price()
             ltp = live_info["price"]

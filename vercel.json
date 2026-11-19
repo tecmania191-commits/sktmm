@@ -1,7 +1,8 @@
 {
   "rewrites": [
-    { "source": "/api/live_tick", "destination": "/api/tick.py" },
-    { "source": "/api/tick", "destination": "/api/tick.py" },
+    { "source": "/api/candles", "destination": "/api/tick.py?endpoint=candles" },
+    { "source": "/api/live_tick", "destination": "/api/tick.py?endpoint=live_tick" },
+    { "source": "/api/tick", "destination": "/api/tick.py?endpoint=tick" },
     { "source": "/api/(.*)", "destination": "/api/tick.py" }
   ]
 }
