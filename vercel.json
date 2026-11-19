@@ -1,9 +1,8 @@
 {
-  "version": 2,
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/index.py"
-    }
+    { "source": "/api/live_tick", "destination": "/api/tick.py" },
+    { "source": "/api/tick", "destination": "/api/tick.py" },
+    { "source": "/api/(.*)", "destination": "/api/tick.py" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
