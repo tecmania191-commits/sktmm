@@ -662,19 +662,7 @@
       wickDownColor: '#f85149',
     });
 
-    const volumeSeries = chart.addHistogramSeries({
-      color: '#238636',
-      priceFormat: { type: 'volume' },
-      priceScaleId: '',
-      scaleMargins: { top: 0.8, bottom: 0 },
-    });
-
     candleSeries.setData(REAL_CANDLES);
-    volumeSeries.setData(REAL_CANDLES.map(c => ({
-      time: c.time,
-      value: c.volume,
-      color: c.close >= c.open ? 'rgba(63, 185, 80, 0.4)' : 'rgba(248, 81, 73, 0.4)'
-    })));
 
     // Dedicated line series for TODAY'S levels ONLY (No infinite lines across history!)
     const todayTargetSeries = chart.addLineSeries({
